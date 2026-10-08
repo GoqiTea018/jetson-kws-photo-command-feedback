@@ -34,8 +34,8 @@ photo_test/
 │   ├── audio_capture.py     # 麦克风收音
 │   └── audio_feedback.py    # 扬声器反馈
 ├── config/                  # 唤醒/指令/诊断关键词及 kws-left.asoundrc
-├── sounds/                  # 当前运行使用的八个 WAV 提示音
-├── tools/                   # photo_check、build_volume_meter、create_sounds
+├── sounds/                  # 八个 WAV 提示音及 create_sounds.py 生成脚本
+├── tools/                   # photo_check、build_volume_meter 诊断工具
 ├── tests/                   # 无硬件回归测试
 ├── docs/                    # integration.md、volume_meter.md 和 history/
 ├── skills/                  # 项目背景与编码规范
@@ -84,7 +84,7 @@ python3 -m tools.build_volume_meter                       # 构建可选音量�
 python3 main.py --volume-meter                            # 显示输入音量
 ```
 
-音量工具详见 [音量诊断说明](docs/volume_meter.md)。提示音生成工具用 `python -m tools.create_sounds`，需要另外安装 `edge-tts`、配置脚本中的 FFmpeg 路径并联网生成；它不参与 Jetson 的离线运行。保留当前生成设置：48 kHz、双声道、32-bit PCM，输出到 `local_assets/`，确认播放效果后再决定是否替换 `sounds/`。
+音量工具详见 [音量诊断说明](docs/volume_meter.md)。提示音生成脚本位于 `sounds/create_sounds.py`，在项目根目录运行 `python sounds/create_sounds.py`；需要另外安装 `edge-tts`、配置脚本中的 FFmpeg 路径并联网生成。它不参与 Jetson 的离线运行。保留当前生成设置：48 kHz、双声道、32-bit PCM，输出到 `local_assets/`，确认播放效果后再决定是否替换 `sounds/`。
 
 当前板卡的有效语音在左声道，`hw:APE,0` 直接读单声道会报错；`config/kws-left.asoundrc` 通过双声道硬件采集提供左声道单声道输入。单独检查：
 

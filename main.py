@@ -1,9 +1,9 @@
-"""Run the wake word and command listener."""
+"""项目启动入口；运行逻辑集中在 voice_control 包中。"""
 
 if __package__:
-    from .live_photo import main
+    from .voice_control.controller import main
 else:
-    from live_photo import main
+    from voice_control.controller import main
 
 
 if __name__ == "__main__":

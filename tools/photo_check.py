@@ -3,9 +3,14 @@
 import argparse
 from pathlib import Path
 
-from app_config import CAPTURE_DEVICE, DEFAULT_SHERPA_DIR, PROJECT_DIR
-from audio_capture import capture_for_kws, split_channels
-from kws_engine import recognize_photo
+if __package__ and "." in __package__:
+    from ..voice_control.config import CAPTURE_DEVICE, CONFIG_DIR, DEFAULT_SHERPA_DIR, PROJECT_DIR
+    from ..voice_control.audio_capture import capture_for_kws, split_channels
+    from ..voice_control.kws_engine import recognize_photo
+else:
+    from voice_control.config import CAPTURE_DEVICE, CONFIG_DIR, DEFAULT_SHERPA_DIR, PROJECT_DIR
+    from voice_control.audio_capture import capture_for_kws, split_channels
+    from voice_control.kws_engine import recognize_photo
 
 
 def main():
@@ -26,10 +31,10 @@ def main():
             parser.error(f"WAV 不存在: {wav}")
         channels = split_channels(wav) if args.raw_wav else [("指定文件", wav)]
     else:
-        wav = PROJECT_DIR / "photo-test.wav"
+        wav = PROJECT_DIR / "local_assets" / "photo-test.wav"
         channels = capture_for_kws(wav, args.device, args.seconds)
 
-    keywords = PROJECT_DIR / "photo_keywords.txt"
+    keywords = CONFIG_DIR / "photo_keywords.txt"
     for name, channel_wav in channels:
         print(f"正在检查{name}声道: {channel_wav}")
         output, found = recognize_photo(args.sherpa_dir.expanduser().resolve(), keywords, channel_wav)

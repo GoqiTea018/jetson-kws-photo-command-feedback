@@ -6,9 +6,9 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from app_config import VoiceCommand
-from command_handler import CommandResult
-from live_photo import VoiceConfig, VoiceController
+from voice_control.config import VoiceCommand
+from voice_control.command_handler import CommandResult
+from voice_control.controller import VoiceConfig, VoiceController
 
 
 class CommandHandlerTests(unittest.TestCase):
@@ -21,7 +21,7 @@ class CommandHandlerTests(unittest.TestCase):
             return CommandResult(True)
 
         controller = VoiceController(VoiceConfig(), handler)
-        with patch("live_photo.play_audio", side_effect=lambda *args: steps.append("feedback")), redirect_stdout(io.StringIO()):
+        with patch("voice_control.controller.play_audio", side_effect=lambda *args: steps.append("feedback")), redirect_stdout(io.StringIO()):
             controller._handle_command("拍照", Path("takephoto.wav"))
         self.assertEqual(steps, ["saved", "feedback"])
 
@@ -30,7 +30,7 @@ class CommandHandlerTests(unittest.TestCase):
             with self.subTest(outcome=outcome):
                 handler = Mock(side_effect=outcome) if isinstance(outcome, Exception) else Mock(return_value=outcome)
                 controller = VoiceController(VoiceConfig(), handler)
-                with patch("live_photo.play_audio") as play, redirect_stdout(io.StringIO()) as output:
+                with patch("voice_control.controller.play_audio") as play, redirect_stdout(io.StringIO()) as output:
                     controller._handle_command("拍照", Path("takephoto.wav"))
                 play.assert_not_called()
                 self.assertIn("指令执行失败", output.getvalue())
@@ -38,7 +38,7 @@ class CommandHandlerTests(unittest.TestCase):
     def test_sleep_never_reaches_business_handler(self):
         handler = Mock()
         controller = VoiceController(VoiceConfig(), handler)
-        with patch("live_photo.play_audio") as play, redirect_stdout(io.StringIO()):
+        with patch("voice_control.controller.play_audio") as play, redirect_stdout(io.StringIO()):
             controller._handle_command("再见楠机", Path("goodbye.wav"))
         handler.assert_not_called()
         play.assert_called_once()
@@ -46,7 +46,7 @@ class CommandHandlerTests(unittest.TestCase):
     def test_failed_action_does_not_prevent_next_command(self):
         handler = Mock(side_effect=[CommandResult(False, "失败"), CommandResult(True)])
         controller = VoiceController(VoiceConfig(), handler)
-        with patch("live_photo.play_audio") as play, redirect_stdout(io.StringIO()):
+        with patch("voice_control.controller.play_audio") as play, redirect_stdout(io.StringIO()):
             controller._handle_command("拍照", Path("takephoto.wav"))
             controller._handle_command("测量", Path("measure.wav"))
         self.assertEqual(play.call_count, 1)

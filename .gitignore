@@ -6,3 +6,4 @@ venv/
 .pytest_cache/
 photo-test*.wav
 *.log
+local_assets/

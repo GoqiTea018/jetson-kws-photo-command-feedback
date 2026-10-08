@@ -4,7 +4,7 @@
 
 ```bash
 cd ~/Documents/voice/photo_test
-python3 build_volume_meter.py
+python3 -m tools.build_volume_meter
 python3 main.py --volume-meter
 ```
 
@@ -23,4 +23,4 @@ python3 main.py --volume-meter
 
 当前 kws_left 只把左声道送入识别，因此日志显示左声道数据。播放期间监听暂停，不打印麦克风音量。音量日志使用识别的同一份样本，不改变音频、模型或关键词阈值。
 
-先保持安静观察背景电平，再说一次唤醒词，比较说话时的变化。持续高电平或高削波提示应进一步检查输入信号；不能仅凭这些数值认定电气连接故障。扬声器电流音属于播放链路，麦克风音量无法直接定位其原因。双声道诊断仍可单独运行 photo_check.py。
+先保持安静观察背景电平，再说一次唤醒词，比较说话时的变化。持续高电平或高削波提示应进一步检查输入信号；不能仅凭这些数值认定电气连接故障。扬声器电流音属于播放链路，麦克风音量无法直接定位其原因。双声道诊断仍可单独运行 `python3 -m tools.photo_check`。

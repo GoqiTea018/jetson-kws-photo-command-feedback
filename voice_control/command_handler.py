@@ -3,10 +3,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-if __package__:
-    from .app_config import VoiceCommand
-else:
-    from app_config import VoiceCommand
+from .config import VoiceCommand
 
 
 @dataclass(frozen=True)

@@ -56,7 +56,7 @@ def recognize_photo(sherpa_dir: Path, keywords: Path, wav: Path) -> tuple[str, b
     """单词诊断入口：返回原始日志和是否识别到拍照，不执行拍照。
 
     stdout/stderr 都可能包含 KWS 事件，因此合并检查；业务层实时
-    指令转换统一在 app_config 中完成，这里只保留 WAV 诊断用途。
+    指令转换统一在 config 中完成，这里只保留 WAV 诊断用途。
     """
     command = _keyword_command(sherpa_dir, keywords, "sherpa-onnx-keyword-spotter")
     result = subprocess.run(

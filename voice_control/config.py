@@ -2,7 +2,9 @@
 from pathlib import Path
 from enum import Enum
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+CONFIG_DIR = PROJECT_DIR / "config"
+SOUNDS_DIR = PROJECT_DIR / "sounds"
 DEFAULT_SHERPA_DIR = Path("~/Documents/voice/sherpa-onnx").expanduser()
 MIC_DEVICE = "kws_left"
 SPEAKER_DEVICE = "hw:APE,0"
@@ -45,7 +47,7 @@ COMMAND_AUDIO_FILES = {
     VoiceCommand.RESET: "reset.wav",
     VoiceCommand.SLEEP: "goodbye.wav",
 }
-# 保留原有导入入口；由统一业务映射生成，避免维护两套关键词表。
+# 从业务映射生成关键词到音频的对应关系，避免维护两套关键词表。
 COMMAND_SOUNDS = {
     keyword: COMMAND_AUDIO_FILES[command]
     for keyword, command in KEYWORD_COMMANDS.items()

@@ -11,26 +11,15 @@ from collections.abc import Collection, Mapping
 from pathlib import Path
 from threading import Event
 
-if __package__:
-    from .app_config import (
-        COMMAND_SOUNDS, DEFAULT_SHERPA_DIR, MIC_DEVICE, PLAYBACK_SETTLE_SECONDS,
-        PROJECT_DIR, SLEEP_KEYWORD, SPEAKER_DEVICE, WAKE_KEYWORD,
-        KEYWORD_COMMANDS, VoiceCommand,
-    )
-    from .command_handler import CommandHandler, CommandResult
-    from .audio_capture import configure_capture_route
-    from .audio_feedback import play_audio
-    from .kws_engine import realtime_command
-else:  # 保持 python main.py / live_photo.py 的原有启动方式。
-    from app_config import (
-        COMMAND_SOUNDS, DEFAULT_SHERPA_DIR, MIC_DEVICE, PLAYBACK_SETTLE_SECONDS,
-        PROJECT_DIR, SLEEP_KEYWORD, SPEAKER_DEVICE, WAKE_KEYWORD,
-        KEYWORD_COMMANDS, VoiceCommand,
-    )
-    from command_handler import CommandHandler, CommandResult
-    from audio_capture import configure_capture_route
-    from audio_feedback import play_audio
-    from kws_engine import realtime_command
+from .config import (
+    COMMAND_SOUNDS, DEFAULT_SHERPA_DIR, MIC_DEVICE, PLAYBACK_SETTLE_SECONDS,
+    CONFIG_DIR, SOUNDS_DIR, SLEEP_KEYWORD, SPEAKER_DEVICE,
+    WAKE_KEYWORD, KEYWORD_COMMANDS, VoiceCommand,
+)
+from .command_handler import CommandHandler, CommandResult
+from .audio_capture import configure_capture_route
+from .audio_feedback import play_audio
+from .kws_engine import realtime_command
 
 
 KEYWORD_EVENT_PATTERN = re.compile(r'\{[^{}]*"keyword"\s*:\s*"([^"]+)"[^{}]*\}')
@@ -171,7 +160,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--mic-device", default=MIC_DEVICE)
     parser.add_argument("--speaker-device", default=SPEAKER_DEVICE)
     parser.add_argument("--once", action="store_true", help="识别并播放一次后退出，便于验收")
-    parser.add_argument("--volume-meter", action="store_true", help="同时打印 KWS 输入音量，需先运行 build_volume_meter.py")
+    parser.add_argument("--volume-meter", action="store_true", help="同时打印 KWS 输入音量，需先运行 python -m tools.build_volume_meter")
     args = parser.parse_args(argv)
     controller = VoiceController(VoiceConfig(**vars(args)))
     try:
@@ -184,18 +173,17 @@ def _run_listener(controller: VoiceController) -> None:
     """保持原有唤醒/指令双循环；不在此模块导入 ECSnake 或 Qt。"""
     config = controller.config
 
-    root = PROJECT_DIR
-    greeting = root / "sounds/nanji.wav"
-    sounds = {keyword: root / "sounds" / filename for keyword, filename in COMMAND_SOUNDS.items()}
+    greeting = SOUNDS_DIR / "nanji.wav"
+    sounds = {keyword: SOUNDS_DIR / filename for keyword, filename in COMMAND_SOUNDS.items()}
     sherpa_dir = config.sherpa_dir.expanduser().resolve()
     # 未启用音量时，继续调用原版可执行文件与原有参数。
     meter_options = {"volume_meter": True} if config.volume_meter else {}
-    wake_command = realtime_command(sherpa_dir, root / "wake_keywords.txt", config.mic_device, **meter_options)
-    command_listener_command = realtime_command(sherpa_dir, root / "command_keywords.txt", config.mic_device, **meter_options)
+    wake_command = realtime_command(sherpa_dir, CONFIG_DIR / "wake_keywords.txt", config.mic_device, **meter_options)
+    command_listener_command = realtime_command(sherpa_dir, CONFIG_DIR / "command_keywords.txt", config.mic_device, **meter_options)
     # 仅虚拟左声道设备加载项目 ALSA 配置；显式设备沿用系统配置。
     env = None
     if config.mic_device == MIC_DEVICE:
-        env = {**os.environ, "ALSA_CONFIG_PATH": str(root / "kws-left.asoundrc")}
+        env = {**os.environ, "ALSA_CONFIG_PATH": str(CONFIG_DIR / "kws-left.asoundrc")}
     if config.volume_meter:
         env = {**(env if env is not None else os.environ), "SHERPA_KWS_VOLUME": "1"}
     for sound in (greeting, *sounds.values()):

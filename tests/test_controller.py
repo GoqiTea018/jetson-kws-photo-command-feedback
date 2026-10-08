@@ -7,10 +7,10 @@ from contextlib import redirect_stdout
 from threading import Event
 from unittest.mock import MagicMock, patch
 
-import live_photo
+from voice_control import controller
 
 
-class LivePhotoTests(unittest.TestCase):
+class ControllerTests(unittest.TestCase):
     def test_stop_without_keyword_releases_listener(self):
         process = MagicMock()
         process.poll.return_value = None
@@ -20,11 +20,11 @@ class LivePhotoTests(unittest.TestCase):
             stop_event.set()
             return [], [], []
 
-        with patch.object(live_photo.subprocess, "Popen", return_value=process), patch.object(
-            live_photo.select, "select", side_effect=poll
-        ), patch.object(live_photo.os, "read") as read:
-            with self.assertRaises(live_photo.ListenerStopped):
-                live_photo.wait_for_keyword(["kws"], {"楠机楠机"}, stop_event=stop_event)
+        with patch.object(controller.subprocess, "Popen", return_value=process), patch.object(
+            controller.select, "select", side_effect=poll
+        ), patch.object(controller.os, "read") as read:
+            with self.assertRaises(controller.ListenerStopped):
+                controller.wait_for_keyword(["kws"], {"楠机楠机"}, stop_event=stop_event)
         read.assert_not_called()
         process.terminate.assert_called_once()
         process.stderr.close.assert_called_once()
@@ -32,11 +32,11 @@ class LivePhotoTests(unittest.TestCase):
     def test_listener_kills_process_if_terminate_times_out(self):
         process = MagicMock()
         process.poll.return_value = None
-        process.wait.side_effect = [live_photo.subprocess.TimeoutExpired("kws", 3), 0]
-        with patch.object(live_photo.subprocess, "Popen", return_value=process), patch.object(
-            live_photo.os, "read", return_value='{"keyword":"拍照"}'.encode("utf-8")
+        process.wait.side_effect = [controller.subprocess.TimeoutExpired("kws", 3), 0]
+        with patch.object(controller.subprocess, "Popen", return_value=process), patch.object(
+            controller.os, "read", return_value='{"keyword":"拍照"}'.encode("utf-8")
         ):
-            self.assertEqual(live_photo.wait_for_keyword(["kws"], {"拍照"}), "拍照")
+            self.assertEqual(controller.wait_for_keyword(["kws"], {"拍照"}), "拍照")
         process.kill.assert_called_once()
         process.stderr.close.assert_called_once()
 
@@ -44,13 +44,13 @@ class LivePhotoTests(unittest.TestCase):
         process = MagicMock()
         process.stderr.fileno.return_value = 3
         process.poll.return_value = None
-        with patch.object(live_photo.subprocess, "Popen", return_value=process), patch.object(
-            live_photo.os, "read", side_effect=[
+        with patch.object(controller.subprocess, "Popen", return_value=process), patch.object(
+            controller.os, "read", side_effect=[
                 '{"keyword":"拍照"}'.encode("utf-8"),
                 '{"keyword":"楠机楠机"}'.encode("utf-8"),
             ]
         ) as read:
-            result = live_photo.wait_for_keyword(["kws"], {"楠机楠机"})
+            result = controller.wait_for_keyword(["kws"], {"楠机楠机"})
         self.assertEqual(result, "楠机楠机")
         self.assertEqual(read.call_count, 2)
         process.terminate.assert_called_once()
@@ -64,10 +64,10 @@ class LivePhotoTests(unittest.TestCase):
             b"2.0% dBFS=-40.0 clip=0.00%\n",
             '{"keyword":"拍照"}'.encode("utf-8"),
         ]
-        with patch.object(live_photo.subprocess, "Popen", return_value=process), patch.object(
-            live_photo.os, "read", side_effect=chunks
+        with patch.object(controller.subprocess, "Popen", return_value=process), patch.object(
+            controller.os, "read", side_effect=chunks
         ), redirect_stdout(io.StringIO()) as output:
-            keyword = live_photo.wait_for_keyword(["kws"], {"拍照"}, {"SHERPA_KWS_VOLUME": "1"})
+            keyword = controller.wait_for_keyword(["kws"], {"拍照"}, {"SHERPA_KWS_VOLUME": "1"})
         self.assertEqual(keyword, "拍照")
         self.assertEqual(output.getvalue(), "[volume] RMS=1.0% peak=2.0% dBFS=-40.0 clip=0.00%\n")
         process.terminate.assert_called_once()
@@ -77,14 +77,14 @@ class LivePhotoTests(unittest.TestCase):
         process.stderr.fileno.return_value = 3
         process.poll.return_value = None
         events = '{"keyword":"录像"}\n{"keyword":"停止录像"}'.encode("utf-8")
-        with patch.object(live_photo.subprocess, "Popen", return_value=process), patch.object(
-            live_photo.os, "read", return_value=events
+        with patch.object(controller.subprocess, "Popen", return_value=process), patch.object(
+            controller.os, "read", return_value=events
         ):
-            result = live_photo.wait_for_keyword(["kws"], live_photo.COMMAND_SOUNDS)
+            result = controller.wait_for_keyword(["kws"], controller.COMMAND_SOUNDS)
         self.assertEqual(result, "停止录像")
 
     def test_wake_precedes_each_command_and_playback(self):
-        for keyword, filename in live_photo.COMMAND_SOUNDS.items():
+        for keyword, filename in controller.COMMAND_SOUNDS.items():
             with self.subTest(keyword=keyword):
                 steps = []
 
@@ -99,12 +99,12 @@ class LivePhotoTests(unittest.TestCase):
                     steps.append(("play", sound.name))
 
                 with patch.object(sys, "argv", ["main.py", "--once"]), patch.object(
-                    live_photo, "realtime_command", side_effect=lambda directory, keywords, device: keywords.name
-                ), patch.object(live_photo, "configure_capture_route"), patch.object(
-                    live_photo, "wait_for_keyword", side_effect=wait
-                ), patch.object(live_photo, "play_audio", side_effect=play):
+                    controller, "realtime_command", side_effect=lambda directory, keywords, device: keywords.name
+                ), patch.object(controller, "configure_capture_route"), patch.object(
+                    controller, "wait_for_keyword", side_effect=wait
+                ), patch.object(controller, "play_audio", side_effect=play):
                     with redirect_stdout(io.StringIO()) as output:
-                        live_photo.main()
+                        controller.main()
 
                 self.assertEqual(steps, [
                     ("wait", "楠机楠机"),
@@ -133,14 +133,14 @@ class LivePhotoTests(unittest.TestCase):
             steps.append(sound.name)
 
         with patch.object(sys, "argv", ["main.py"]), patch.object(
-            live_photo, "realtime_command", side_effect=lambda directory, keywords, device: keywords.name
-        ), patch.object(live_photo, "configure_capture_route"), patch.object(
-            live_photo, "wait_for_keyword", side_effect=wait
-        ), patch.object(live_photo, "play_audio", side_effect=play), patch.object(
-            live_photo.time, "sleep"
+            controller, "realtime_command", side_effect=lambda directory, keywords, device: keywords.name
+        ), patch.object(controller, "configure_capture_route"), patch.object(
+            controller, "wait_for_keyword", side_effect=wait
+        ), patch.object(controller, "play_audio", side_effect=play), patch.object(
+            controller.time, "sleep"
         ):
             with redirect_stdout(io.StringIO()) as output:
-                live_photo.main()
+                controller.main()
 
         self.assertEqual(steps, ["wake", "nanji.wav", "拍照", "takephoto.wav", "测量", "measure.wav"])
         self.assertEqual(output.getvalue().count("继续监听指令"), 2)
@@ -164,14 +164,14 @@ class LivePhotoTests(unittest.TestCase):
             return keyword
 
         with patch.object(sys, "argv", ["main.py"]), patch.object(
-            live_photo, "realtime_command", side_effect=lambda directory, keywords, device: keywords.name
-        ), patch.object(live_photo, "configure_capture_route"), patch.object(
-            live_photo, "wait_for_keyword", side_effect=wait
-        ), patch.object(live_photo, "play_audio", side_effect=lambda sound, device: steps.append(sound.name)), patch.object(
-            live_photo.time, "sleep"
+            controller, "realtime_command", side_effect=lambda directory, keywords, device: keywords.name
+        ), patch.object(controller, "configure_capture_route"), patch.object(
+            controller, "wait_for_keyword", side_effect=wait
+        ), patch.object(controller, "play_audio", side_effect=lambda sound, device: steps.append(sound.name)), patch.object(
+            controller.time, "sleep"
         ):
             with redirect_stdout(io.StringIO()) as output:
-                live_photo.main()
+                controller.main()
 
         self.assertEqual(wake_count, 2)
         self.assertEqual(steps, [

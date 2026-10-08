@@ -7,10 +7,7 @@ import sys
 import wave
 from pathlib import Path
 
-if __package__:
-    from .app_config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
-else:
-    from app_config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
+from .config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
 
 
 def configure_capture_route() -> None:

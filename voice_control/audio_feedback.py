@@ -3,17 +3,14 @@
 import subprocess
 from pathlib import Path
 
-if __package__:
-    from .app_config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
-else:
-    from app_config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
+from .config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
 
 
 def play_audio(sound_path: Path, device: str) -> None:
     """同步播放 WAV，aplay 成功退出后返回；不代表业务动作完成。
 
     调用前须释放 KWS 麦克风。播放设备 device 与录音设备独立配置，
-    路由参数继续取 app_config，避免在业务代码重复硬件常量。
+    路由参数继续取 config，避免在业务代码重复硬件常量。
     """
     if not sound_path.is_file():
         raise FileNotFoundError(f"提示音不存在: {sound_path}")

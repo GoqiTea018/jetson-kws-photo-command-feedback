@@ -4,7 +4,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from app_config import DEFAULT_SHERPA_DIR
+if __package__ and "." in __package__:
+    from ..voice_control.config import DEFAULT_SHERPA_DIR
+else:
+    from voice_control.config import DEFAULT_SHERPA_DIR
 
 METER_CODE = r"""
     // 统计识别使用的同一份单声道数据，不修改样本、不另开 ALSA 设备。

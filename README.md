@@ -12,7 +12,7 @@
 | 归零 | `reset.wav` |
 | 再见楠机 | `goodbye.wav`，播放后重新等待唤醒 |
 
-**当前只验证语音指令与反馈，不控制相机或录像，也不会保存照片。**
+默认运行提供语音指令识别与提示音反馈；相机、录像等功能通过业务处理接口接入。
 
 默认启动会明确显示“提示音演示模式”。既有 WAV 中的成功措辞仅用于演示；终端不再在没有相机动作时打印“拍照成功”。传入真实业务处理函数后，只有该函数确认动作完成，才播放对应提示音。
 
@@ -22,11 +22,11 @@
 
 ```text
 photo_test/
-├── main.py                  # 独立启动入口
+├── main.py                  # 启动入口
 ├── __init__.py              # 供 ECSnake 导入的公开接口
 ├── __main__.py              # python -m photo_test 入口
 ├── voice_control/           # 运行代码
-│   ├── __init__.py          # 统一导出业务接口
+│   ├── __init__.py          # 接口
 │   ├── controller.py        # 唤醒、监听、动作处理与停止
 │   ├── config.py            # 统一指令、设备及资源路径
 │   ├── command_handler.py   # 业务处理与完成结果契约
@@ -105,14 +105,14 @@ from photo_test import CommandResult, VoiceCommand, VoiceConfig, VoiceController
 
 在工作线程运行 `VoiceController.run()`，退出时调用 `stop()`。业务处理函数必须等待实际完成后返回 `CommandResult`；失败或未确认结果不会播放成功提示音。Qt 线程要求、录像状态判断和多摄像头拍照条件见 [联动接口说明](docs/integration.md)。“归零”按用户确认保留接口，不接实际机械动作。
 
-## 验证
+## 开发测试
 
 ```bash
 python -m unittest discover -s tests -v
 python -m compileall -q voice_control tools tests main.py __init__.py __main__.py
 ```
 
-测试可在 Windows 上运行；真人语音识别、音频播放和实际照片保存仍需 Jetson 现场验收。模型、sherpa-onnx 编译程序和虚拟环境不包含在仓库中。
+开发测试可在 Windows 上运行。模型、sherpa-onnx 编译程序和虚拟环境不包含在仓库中。
 
 ## Jetson Nano Super 接线
 

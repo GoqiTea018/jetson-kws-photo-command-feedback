@@ -22,7 +22,7 @@ voice_controller = VoiceController(VoiceConfig(), command_handler=handle_command
 
 ## ECSnake dev 联动检查
 
-本次核对的是 [ECSnake dev](https://github.com/DarkBlueFox/ECSnake/tree/dev)，提交 `ef7efa34c0fe23c4864caa23bb2697696eec6ac3`。这里只准备语音侧的接口，尚未安装 Qt 适配层或验证联动。
+以下接口说明对应 [ECSnake dev](https://github.com/DarkBlueFox/ECSnake/tree/dev) 的提交 `ef7efa34c0fe23c4864caa23bb2697696eec6ac3`。语音包提供业务处理接口，Qt 适配层负责连接 ECSnake 的具体动作与完成信号。
 
 | 语音业务指令 | ECSnake 当前入口或信号 | 联动约束 |
 | --- | --- | --- |

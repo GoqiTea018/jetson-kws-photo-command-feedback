@@ -37,13 +37,15 @@ photo_test/
 ├── sounds/                  # 八个 WAV 提示音及 create_sounds.py 生成脚本
 ├── tools/                   # photo_check、build_volume_meter 诊断工具
 ├── tests/                   # 无硬件回归测试
-├── docs/                    # integration.md、volume_meter.md 和 history/
+├── docs/                    # 代码说明、联动说明、音量说明及 history/
 ├── skills/                  # 项目背景与编码规范
 ├── README.md
 └── .gitignore
 ```
 
 `local_assets/` 保存本地生成的音频与诊断录音，已忽略提交；程序不会自动使用这里的提示音。`docs/history/` 是历史记录，旧命令以当前 README 为准。
+
+类的职责、变量含义、函数参数与调用流程见 [代码说明文档](docs/代码说明.md)。
 
 ## 环境与启动
 

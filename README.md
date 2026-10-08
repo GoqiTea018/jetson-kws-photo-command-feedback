@@ -14,6 +14,8 @@
 
 **当前只验证语音指令与反馈，不控制相机或录像，也不会保存照片。**
 
+默认启动会明确显示“提示音演示模式”。既有 WAV 中的成功措辞仅用于演示；终端不再在没有相机动作时打印“拍照成功”。传入真实业务处理函数后，只有该函数确认动作完成，才播放对应提示音。
+
 ## 已验证的硬件与软件
 
 - Jetson 的 ALSA 声卡为 `APE`，录音和播放设备均使用设备 0；I2S 接口为 `I2S2`。
@@ -104,6 +106,9 @@ aplay -D hw:APE,0 sounds/takephoto.wav
 | --- | --- |
 | `main.py` | 启动实时唤醒与指令监听。 |
 | `live_photo.py` | 唤醒后持续监听指令；识别“再见楠机”后重新等待唤醒。 |
+| `app_config.py` | 统一中文关键词、英文业务指令、音频文件及硬件默认参数。 |
+| `command_handler.py` | 业务处理接口与完成结果，不依赖 Qt 或相机。 |
+| `__init__.py`、`__main__.py` | 独立包导入及 `python -m photo_test` 入口。 |
 | `photo_check.py` | 原有的一次性“拍照”录音检查。 |
 | `kws_engine.py` | 组合 sherpa-onnx 的模型、关键词与实时识别命令；也支持已有 WAV 的识别。 |
 | `audio_capture.py` | 设置收音路由，提供一次性录音与左右声道检查。 |
@@ -127,3 +132,53 @@ ffmpeg -i sounds/photo_success.wav -ar 48000 -ac 2 -c:a pcm_s16le sounds/photo_s
 ```
 
 模型、编译后的 sherpa-onnx 和 Python 虚拟环境不包含在本仓库中。硬件录音、播放与真人触发需要在 Jetson 上验收。
+
+## 封装接口与命名
+
+Python 变量、函数使用 `snake_case`，类使用 `PascalCase`，常量使用 `UPPER_SNAKE_CASE`。KWS 中文关键词通过 `KEYWORD_COMMANDS` 转换为 `VoiceCommand`；业务层无需解析中文，也无需知道音频文件名。录像统一使用 `recording`；项目音频仍使用原文件名，不需要重新生成或部署 WAV。
+
+把完整 `photo_test/` 目录放在 ECSnake 根目录下，可通过包名导入，避免与 ECSnake 的 `main.py`、配置等顶层模块冲突：
+
+```python
+from photo_test import CommandResult, VoiceCommand, VoiceConfig, VoiceController
+
+def handle_command(command: VoiceCommand) -> CommandResult:
+    # 这里只演示接口。未接入的业务必须返回失败，不能假装执行成功。
+    return CommandResult(False, f"业务尚未接入：{command.value}")
+
+voice_controller = VoiceController(VoiceConfig(), command_handler=handle_command)
+# 在专用工作线程中调用 voice_controller.run()；不要阻塞 Qt GUI 主线程。
+# 主应用退出时调用 voice_controller.stop()，随后等待工作线程结束。
+```
+
+`run()` 持续执行“唤醒 → 识别 → 业务处理 → 反馈”；`stop()` 可以跨线程调用。无关键词时通过 Linux 管道轮询检查停止请求，随后回收 KWS 进程；已经开始的业务调用和播放会等待其结束。业务处理必须提供超时，不能无限等待。一个实例只运行在一个线程中，停止后重新启动需要新建实例。
+
+命令行保持 `python main.py`；从父目录也可执行 `python -m photo_test --once`。实时音频依赖 Jetson/Linux 的 ALSA 与管道轮询，Windows 用于开发和无硬件测试。
+
+## ECSnake dev 联动检查
+
+本次核对的是 [ECSnake dev](https://github.com/DarkBlueFox/ECSnake/tree/dev)，提交 `ef7efa34c0fe23c4864caa23bb2697696eec6ac3`。这里只准备语音侧的接口，尚未安装 Qt 适配层或验证联动。
+
+| 语音业务指令 | ECSnake 当前入口或信号 | 联动约束 |
+| --- | --- | --- |
+| `take_photo` | `MainWindow._on_take_photo()` / `CameraView.take_photo()`；`photo_saved_signal(str)`、`photo_failed_signal()` | 请求异步执行，方法返回不代表完成；需等保存结果。 |
+| `start_recording` / `stop_recording` | 界面 `toggle_recording()`；相机线程 `start_recording()`、`stop_recording()`；`recording_status_signal(bool)` | 两条指令须先判断状态，不能都直接调用 toggle。 |
+| `freeze` | `MainWindow._on_freeze_clicked()` | 当前为切换行为；语音究竟表示冻结还是切换需联动时确认。 |
+| `measure` | `MainWindow._on_measure_clicked()` | 方法返回不等于测量结果已生成，需要适配完成结果。 |
+| `reset` | 存在设置零点和回零流程 | 用户已确认先保留接口，不接实际机械动作。 |
+| `sleep` | 本服务内部处理 | 播放退出提示后回到等待唤醒，不发送业务指令。 |
+
+Qt 适配层应从语音工作线程发出 queued signal，在 GUI 线程调用界面入口；语音线程等待完成/失败结果或超时后返回 `CommandResult`。失败、异常以及 `None` 等未确认结果不会播放成功提示音，服务会继续监听。当前没有失败提示音，失败原因只打印到终端。
+
+拍照还存在两项未确认条件：多摄像头要按“任一成功”还是“全部成功”判定；当前 ECSnake 相机保存代码没有检查 `cv2.imwrite()` 的布尔返回值。因此仅收到 `photo_saved_signal` 仍不足以严格确认写入成功，真正接入时须检查写入结果，并确认本次请求对应的文件。适配层还应关联本次请求，避免将其他按钮触发的保存事件当作语音拍照结果。本次不推断这些业务规则，也不修改 ECSnake 仓库。
+
+根目录的 `Jetson离线语音控制方案.md` 和 `Jetson_KWS项目进度.md` 保留阶段记录，其中旧的 `main.py --raw-wav` 用法现应改为 `photo_check.py --raw-wav`；当前关键词是“录像”、唤醒词是“楠机楠机”，音频文件名以本 README 和 `app_config.py` 为准。
+
+无硬件验证：
+
+```bash
+python -m unittest -v
+python -m compileall -q .
+```
+
+测试覆盖唤醒门控、连续指令、退出重唤醒、跨块日志、业务完成后反馈、失败抑制反馈和主动停止的进程回收。语音识别率、现场播放和实际照片保存仍需 Jetson 联动验收。

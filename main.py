@@ -1,6 +1,9 @@
 """Run the wake word and command listener."""
 
-from live_photo import main
+if __package__:
+    from .live_photo import main
+else:
+    from live_photo import main
 
 
 if __name__ == "__main__":

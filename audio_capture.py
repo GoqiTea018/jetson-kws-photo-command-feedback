@@ -7,11 +7,14 @@ import sys
 import wave
 from pathlib import Path
 
-from app_config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
+if __package__:
+    from .app_config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
+else:
+    from app_config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
 
 
-def configure_capture_route():
-    """Route I2S2 input to the first ALSA capture stream (ADMAIF1)."""
+def configure_capture_route() -> None:
+    """将 I2S2 麦克风输入送往 ADMAIF1；与播放方向分开配置。"""
     subprocess.run(
         ["amixer", "-c", AUDIO_CARD, "cset", f"name={DMA_INTERFACE} Mux", I2S_INTERFACE],
         check=True,
@@ -64,8 +67,12 @@ def split_channels(source: Path):
     return outputs
 
 
-def capture_for_kws(destination: Path, device: str, seconds: int):
-    """Record raw audio and return both mono candidates for recognition."""
+def capture_for_kws(destination: Path, device: str, seconds: int) -> list[tuple[str, Path]]:
+    """诊断录音：保留双声道原始文件，返回左右声道名称及单声道路径。
+
+    这里使用原始双声道设备，不使用实时监听的 kws_left；必须分别
+    检查两条 I2S 数据槽，异常右声道可能比真实语音更响。
+    """
     destination.parent.mkdir(parents=True, exist_ok=True)
     # 原始录音用于复查，拆分文件不覆盖原始双声道证据。
     raw = destination.with_name(destination.stem + "-raw.wav")

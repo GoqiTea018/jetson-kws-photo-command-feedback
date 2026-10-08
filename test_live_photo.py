@@ -4,12 +4,42 @@ import io
 import sys
 import unittest
 from contextlib import redirect_stdout
+from threading import Event
 from unittest.mock import MagicMock, patch
 
 import live_photo
 
 
 class LivePhotoTests(unittest.TestCase):
+    def test_stop_without_keyword_releases_listener(self):
+        process = MagicMock()
+        process.poll.return_value = None
+        stop_event = Event()
+
+        def poll(*args):
+            stop_event.set()
+            return [], [], []
+
+        with patch.object(live_photo.subprocess, "Popen", return_value=process), patch.object(
+            live_photo.select, "select", side_effect=poll
+        ), patch.object(live_photo.os, "read") as read:
+            with self.assertRaises(live_photo.ListenerStopped):
+                live_photo.wait_for_keyword(["kws"], {"楠机楠机"}, stop_event=stop_event)
+        read.assert_not_called()
+        process.terminate.assert_called_once()
+        process.stderr.close.assert_called_once()
+
+    def test_listener_kills_process_if_terminate_times_out(self):
+        process = MagicMock()
+        process.poll.return_value = None
+        process.wait.side_effect = [live_photo.subprocess.TimeoutExpired("kws", 3), 0]
+        with patch.object(live_photo.subprocess, "Popen", return_value=process), patch.object(
+            live_photo.os, "read", return_value='{"keyword":"拍照"}'.encode("utf-8")
+        ):
+            self.assertEqual(live_photo.wait_for_keyword(["kws"], {"拍照"}), "拍照")
+        process.kill.assert_called_once()
+        process.stderr.close.assert_called_once()
+
     def test_command_event_does_not_satisfy_wake_listener(self):
         process = MagicMock()
         process.stderr.fileno.return_value = 3
@@ -58,7 +88,7 @@ class LivePhotoTests(unittest.TestCase):
             with self.subTest(keyword=keyword):
                 steps = []
 
-                def wait(command, keywords, env):
+                def wait(command, keywords, env, stop_event=None):
                     if "楠机楠机" in keywords:
                         steps.append(("wait", "楠机楠机"))
                         return "楠机楠机"
@@ -88,7 +118,7 @@ class LivePhotoTests(unittest.TestCase):
         steps = []
         commands = iter(("拍照", "测量"))
 
-        def wait(command, keywords, env):
+        def wait(command, keywords, env, stop_event=None):
             if "楠机楠机" in keywords:
                 steps.append("wake")
                 return "楠机楠机"
@@ -120,7 +150,7 @@ class LivePhotoTests(unittest.TestCase):
         commands = iter(("拍照", "再见楠机", "测量"))
         wake_count = 0
 
-        def wait(command, keywords, env):
+        def wait(command, keywords, env, stop_event=None):
             nonlocal wake_count
             if "楠机楠机" in keywords:
                 wake_count += 1

@@ -9,6 +9,8 @@ from .config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
 def play_audio(sound_path: Path, device: str) -> None:
     """同步播放 WAV，aplay 成功退出后返回；不代表业务动作完成。
 
+    sound_path 是 WAV 文件完整路径，device 是 ALSA 输出设备名称。
+    无返回值；文件不存在或播放命令失败时抛出异常，由调用方处理。
     调用前须释放 KWS 麦克风。播放设备 device 与录音设备独立配置，
     路由参数继续取 config，避免在业务代码重复硬件常量。
     """

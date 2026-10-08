@@ -9,6 +9,9 @@ if __package__ and "." in __package__:
 else:
     from voice_control.config import DEFAULT_SHERPA_DIR
 
+# 待插入 sherpa-onnx 的 C++ 片段，不是 Python 逻辑；r 前缀保留 \n 等转义文字。
+# sum_squares 累积平方幅度，sample_count 累积样本数，peak 记录最大幅度，
+# clipped 统计近满量程样本数；每半秒由这些值计算 RMS、dBFS 和削波占比。
 METER_CODE = r"""
     // 统计识别使用的同一份单声道数据，不修改样本、不另开 ALSA 设备。
     if (show_volume) {
@@ -33,20 +36,21 @@ METER_CODE = r"""
 
 
 def main():
+    """临时修改 C++ 源码构建音量版，然后恢复原源码和原可执行程序。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sherpa-dir", type=Path, default=DEFAULT_SHERPA_DIR)
     args = parser.parse_args()
-    sherpa_dir = args.sherpa_dir.expanduser().resolve()
-    source = sherpa_dir / "sherpa-onnx/csrc/sherpa-onnx-keyword-spotter-alsa.cc"
-    binary = sherpa_dir / "build/bin/sherpa-onnx-keyword-spotter-alsa"
-    destination = binary.with_name(binary.name + "-volume")
-    original_source = source.read_bytes()
+    sherpa_dir = args.sherpa_dir.expanduser().resolve()  # sherpa-onnx 工程根目录。
+    source = sherpa_dir / "sherpa-onnx/csrc/sherpa-onnx-keyword-spotter-alsa.cc"  # 待添加日志的 C++ 源文件。
+    binary = sherpa_dir / "build/bin/sherpa-onnx-keyword-spotter-alsa"  # 原版程序路径。
+    destination = binary.with_name(binary.name + "-volume")  # 独立音量版输出路径。
+    original_source = source.read_bytes()  # 原源码字节，供 finally 原样恢复。
     # 使用独立备份，失败时也恢复原版；不覆盖原版 KWS 的日常使用入口。
-    backup = binary.with_name(binary.name + ".volume-backup")
+    backup = binary.with_name(binary.name + ".volume-backup")  # 原程序的临时备份路径。
     if backup.exists():
         raise RuntimeError(f"备份已存在，请先检查: {backup}")
-    text = original_source.decode("utf-8")
-    anchor = "    const std::vector<float> &samples = alsa.Read(chunk);"
+    text = original_source.decode("utf-8")  # 用于插入日志的源码文字副本。
+    anchor = "    const std::vector<float> &samples = alsa.Read(chunk);"  # 插入位置的精确匹配文本。
     if text.count(anchor) != 1 or text.count("  while (!stop) {") != 1:
         raise RuntimeError("KWS 源码版本不匹配，未进行修改")
     text = text.replace("#include <algorithm>", "#include <algorithm>\n#include <cmath>")
@@ -64,6 +68,7 @@ def main():
                         "--target", "sherpa-onnx-keyword-spotter-alsa", "-j2"], check=True)
         shutil.copy2(binary, destination)
     finally:
+        # 无论编译是否成功都恢复原文件；destination 只在编译成功后写入。
         source.write_bytes(original_source)
         shutil.copy2(backup, binary)
         backup.unlink()

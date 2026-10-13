@@ -6,12 +6,33 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from voice_control.config import VoiceCommand
+from voice_control.config import VoiceCommand, KEYWORD_COMMANDS, COMMAND_SOUNDS
 from voice_control.command_handler import CommandResult
 from voice_control.controller import VoiceConfig, VoiceController
 
 
 class CommandHandlerTests(unittest.TestCase):
+    def test_empty_prompt_preserves_business_dispatch(self):
+        for keyword, filename in COMMAND_SOUNDS.items():
+            if filename:
+                continue
+            for success in (True, False):
+                with self.subTest(keyword=keyword, success=success):
+                    handler = Mock(return_value=CommandResult(success, "test"))
+                    service = VoiceController(VoiceConfig(), handler)
+                    with patch.object(service, "_play_sound") as play, redirect_stdout(io.StringIO()) as output:
+                        service._handle_command(keyword, None)
+                    handler.assert_called_once_with(KEYWORD_COMMANDS[keyword])
+                    play.assert_not_called()
+                    self.assertIn("指令执行成功" if success else "指令执行失败", output.getvalue())
+
+    def test_empty_prompt_without_handler_reports_recognition(self):
+        service = VoiceController(VoiceConfig())
+        with patch.object(service, "_play_sound") as play, redirect_stdout(io.StringIO()) as output:
+            service._handle_command("相册", None)
+        play.assert_not_called()
+        self.assertIn("已识别指令：相册", output.getvalue())
+
     def test_photo_completion_precedes_feedback(self):
         steps = []
 
@@ -39,7 +60,7 @@ class CommandHandlerTests(unittest.TestCase):
         handler = Mock()
         controller = VoiceController(VoiceConfig(), handler)
         with patch("voice_control.controller.play_audio") as play, redirect_stdout(io.StringIO()):
-            controller._handle_command("再见楠机", Path("goodbye.wav"))
+            controller._handle_command("再见小南", Path("goodbye.wav"))
         handler.assert_not_called()
         play.assert_called_once()
 

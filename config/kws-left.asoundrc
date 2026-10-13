@@ -9,3 +9,26 @@ pcm.kws_left {
     }
     ttable.0.0 1
 }
+
+# 所有模式均从硬件采集双声道，再提供 KWS 所需的单声道。
+pcm.kws_right {
+    type route
+    slave {
+        pcm "hw:APE,0"
+        channels 2
+        format S16_LE
+    }
+    ttable.0.1 1
+}
+
+# 两路均为有效语音时使用；异常声道也会混入，不能按音量自动启用。
+pcm.kws_mix {
+    type route
+    slave {
+        pcm "hw:APE,0"
+        channels 2
+        format S16_LE
+    }
+    ttable.0.0 0.5
+    ttable.0.1 0.5
+}

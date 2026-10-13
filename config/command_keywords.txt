@@ -1,7 +1,16 @@
 p āi zh ào @拍照
 l ù x iàng @录像
 t íng zh ǐ l ù x iàng @停止录像
-d òng j ié @冻结
+d òng j ié h uà m iàn @冻结画面
 c è l iáng @测量
-g uī l íng @归零
-z ài j iàn @再见楠机
+f ù w èi @复位
+z ài j iàn x iǎo n án @再见小南
+x iàng c è @相册
+c ài d ān @菜单
+r ì j iān @日间
+y è j iān @夜间
+k āi q ǐ j iǎn c è @开启检测
+t íng zh ǐ j iǎn c è @停止检测
+ch á k àn g ào j ǐng @查看告警
+z ēng j iā s ù d ù @增加速度
+j iàng d ī s ù d ù @降低速度

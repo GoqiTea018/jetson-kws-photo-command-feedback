@@ -22,7 +22,7 @@ class ResourceLayoutTests(unittest.TestCase):
                 os.chdir(directory)
                 with patch.object(controller, "realtime_command", return_value=["kws"]) as build, patch.object(
                     controller, "configure_capture_route"
-                ), patch.object(controller, "wait_for_keyword", side_effect=["楠机楠机", "拍照"]) as wait, patch.object(
+                ), patch.object(controller, "wait_for_keyword", side_effect=["小南小南", "拍照"]) as wait, patch.object(
                     controller, "play_audio"
                 ) as play, redirect_stdout(io.StringIO()):
                     controller.VoiceController(controller.VoiceConfig(once=True)).run()
@@ -42,7 +42,24 @@ class ResourceLayoutTests(unittest.TestCase):
                 self.assertTrue((CONFIG_DIR / name).is_file())
         for name in ("nanji.wav", *COMMAND_AUDIO_FILES.values()):
             with self.subTest(name=name):
-                self.assertTrue((SOUNDS_DIR / name).is_file())
+                if name:
+                    self.assertTrue((SOUNDS_DIR / name).is_file())
+
+    def test_channel_inputs_load_project_alsa_configuration(self):
+        for device in ("kws_left", "kws_right", "kws_mix", "custom_input"):
+            with self.subTest(device=device), patch.object(
+                controller, "realtime_command", return_value=["kws"]
+            ) as build, patch.object(controller, "configure_capture_route"), patch.object(
+                controller, "wait_for_keyword", side_effect=["小南小南", "拍照"]
+            ) as wait, patch.object(controller, "play_audio"), redirect_stdout(io.StringIO()):
+                controller.VoiceController(controller.VoiceConfig(once=True, mic_device=device)).run()
+                self.assertEqual(build.call_args_list[0].args[2], device)
+                self.assertEqual(build.call_args_list[1].args[2], device)
+                env = wait.call_args_list[0].args[2]
+                if device == "custom_input":
+                    self.assertIsNone(env)
+                else:
+                    self.assertEqual(env["ALSA_CONFIG_PATH"], str(CONFIG_DIR / "kws-left.asoundrc"))
 
     def test_keyword_file_and_command_mapping_agree(self):
         keyword_text = (CONFIG_DIR / "command_keywords.txt").read_text(encoding="utf-8")

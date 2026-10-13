@@ -7,7 +7,7 @@ from .config import AUDIO_CARD, DMA_INTERFACE, I2S_INTERFACE
 
 
 def play_audio(sound_path: Path, device: str) -> None:
-    """同步播放 WAV，aplay 成功退出后返回；不代表业务动作完成。
+    """同步播放 WAV，aplay 成功退出后返回。
 
     sound_path 是 WAV 文件完整路径，device 是 ALSA 输出设备名称。
     无返回值；文件不存在或播放命令失败时抛出异常，由调用方处理。

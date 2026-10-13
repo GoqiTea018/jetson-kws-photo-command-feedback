@@ -1,24 +1,31 @@
 # Jetson 离线唤醒与语音指令反馈
 
-在 Jetson Orin Nano Super 上持续监听 I2S 麦克风。说“楠机楠机”唤醒，扬声器播放 `nanji.wav`（“你好呀，我是楠机”）；播完后可连续说指令，每条指令播放对应提示音。说“再见楠机”后播放 `goodbye.wav`，程序退出指令模式，重新等待“楠机楠机”。未唤醒时指令不会触发播放。识别与播放均在本机完成，运行时无需联网。
+在 Jetson Orin Nano Super 上持续监听 I2S 麦克风。说“小南小南”唤醒，扬声器播放 `nanji.wav`（“你好呀，我是楠机”）；播完后可连续说指令（拍照、录像、停止录像、复位、冻结画面、测量），已配置提示音的指令播放对应音频。说“再见小南”后播放 `goodbye.wav`，程序退出指令模式，重新等待“小南小南”。未唤醒时指令不会触发播放。识别与播放均在本机完成，运行时无需联网。
 
 | 指令 | 提示音 |
 | --- | --- |
 | 拍照 | `takephoto.wav` |
 | 录像 | `start_record.wav` |
 | 停止录像 | `stop_record.wav` |
-| 冻结 | `freeze.wav` |
+| 冻结画面 | `freeze.wav` |
 | 测量 | `measure.wav` |
-| 归零 | `reset.wav` |
-| 再见楠机 | `goodbye.wav`，播放后重新等待唤醒 |
+| 复位 | `reset.wav` |
+| 相册 | 暂空 |
+| 菜单 | 暂空 |
+| 日间 | 暂空 |
+| 夜间 | 暂空 |
+| 开启检测 | 暂空 |
+| 停止检测 | 暂空 |
+| 查看告警 | 暂空 |
+| 增加速度 | 暂空 |
+| 降低速度 | 暂空 |
+| 再见小南 | `goodbye.wav`，播放后重新等待唤醒 |
 
-默认运行提供语音指令识别与提示音反馈；相机、录像等功能通过业务处理接口接入。
+新增指令的提示音可在 `voice_control/config.py` 的 `COMMAND_AUDIO_FILES` 中填写，例如 `VoiceCommand.OPEN_ALBUM: "album.wav"`，并把音频放入 `sounds/`。保留 `""` 时，指令照常识别并传给业务处理函数，跳过提示音播放。
 
-默认启动会明确显示“提示音演示模式”。既有 WAV 中的成功措辞仅用于演示；终端不再在没有相机动作时打印“拍照成功”。传入真实业务处理函数后，只有该函数确认动作完成，才播放对应提示音。
+默认运行提供语音指令识别与提示音反馈；相机、录像等功能暂时还没有接入。
 
 ## 工程结构
-
-根目录只保留启动入口、公开导入入口与说明；运行代码、工具和测试分别管理。
 
 ```text
 photo_test/
@@ -34,7 +41,7 @@ photo_test/
 │   ├── audio_capture.py     # 麦克风收音
 │   └── audio_feedback.py    # 扬声器反馈
 ├── config/                  # 唤醒/指令/诊断关键词及 kws-left.asoundrc
-├── sounds/                  # 八个 WAV 提示音及 create_sounds.py 生成脚本
+├── sounds/                  # 八个 WAV 格式提示音及 create_sounds.py 生成脚本
 ├── tools/                   # photo_check、build_volume_meter 诊断工具
 ├── tests/                   # 无硬件回归测试
 ├── docs/                    # 代码说明、联动说明、音量说明及 history/
@@ -70,9 +77,11 @@ python3 main.py --once        # 唤醒并处理一条指令后退出
 python3 main.py               # 持续运行
 ```
 
-如使用已有虚拟环境，将 `python3` 换为 `~/Documents/voice/venv/bin/python`。先说“楠机楠机”，问候语播完再说指令；唤醒一次即可连续使用，说“再见楠机”返回等待唤醒，按 `Ctrl+C` 停止。模型目前用“再见”的音素触发退出，因此单独说“再见”也可能退出指令模式。
+如使用已有虚拟环境，将 `python3` 换为 `~/Documents/voice/venv/bin/python`。先说“小南小南”，问候语播完再说指令；唤醒一次即可连续使用，说“再见小南”返回等待唤醒，按 `Ctrl+C` 停止。退出口令词表使用完整的“再见小南”音素。
 
 默认收音设备是 `kws_left`，播放设备是 `hw:APE,0`。可以传入 `--sherpa-dir`、`--mic-device`、`--speaker-device`；全部选项用 `python3 main.py --help` 查看。从父目录也可使用 `python3 -m photo_test --once`。
+
+启动时自动检查音频设备和 I2S2 配置。未检测到麦克风信号时，请检查供电和接线；设备错误时会显示原因。检查完成后，说“小南小南”开始使用。
 
 ## 诊断与开发工具
 
@@ -86,7 +95,7 @@ python3 -m tools.build_volume_meter                       # 构建可选音量�
 python3 main.py --volume-meter                            # 显示输入音量
 ```
 
-音量工具详见 [音量诊断说明](docs/volume_meter.md)。提示音生成脚本位于 `sounds/create_sounds.py`，在项目根目录运行 `python sounds/create_sounds.py`；需要另外安装 `edge-tts`、配置脚本中的 FFmpeg 路径并联网生成。它不参与 Jetson 的离线运行。保留当前生成设置：48 kHz、双声道、32-bit PCM，输出到 `local_assets/`，确认播放效果后再决定是否替换 `sounds/`。
+音量工具详见 [音量诊断说明](docs/volume_meter.md)。提示音生成脚本位于 `sounds/create_sounds.py`，若运行 `python sounds/create_sounds.py`生成自定义的声音，需要另外安装 `edge-tts`、配置脚本中的 FFmpeg 路径并联网生成。生成wav设置：48 kHz、双声道、32-bit PCM，输出到 `local_assets/`。
 
 当前板卡的有效语音在左声道，`hw:APE,0` 直接读单声道会报错；`config/kws-left.asoundrc` 通过双声道硬件采集提供左声道单声道输入。单独检查：
 
@@ -105,7 +114,7 @@ aplay -D hw:APE,0 sounds/nanji.wav
 from photo_test import CommandResult, VoiceCommand, VoiceConfig, VoiceController
 ```
 
-在工作线程运行 `VoiceController.run()`，退出时调用 `stop()`。业务处理函数必须等待实际完成后返回 `CommandResult`；失败或未确认结果不会播放成功提示音。Qt 线程要求、录像状态判断和多摄像头拍照条件见 [联动接口说明](docs/integration.md)。“归零”按用户确认保留接口，不接实际机械动作。
+在工作线程运行 `VoiceController.run()`，退出时调用 `stop()`。业务处理函数必须等待实际完成后返回 `CommandResult`；失败或未确认结果不会播放成功提示音。Qt 线程要求、录像状态判断和多摄像头拍照条件见 [联动接口说明](docs/integration.md)。“复位”操作留接口，不接实际机械动作。
 
 ## 开发测试
 
@@ -116,7 +125,7 @@ python -m compileall -q voice_control tools tests main.py __init__.py __main__.p
 
 开发测试可在 Windows 上运行。模型、sherpa-onnx 编译程序和虚拟环境不包含在仓库中。
 
-## Jetson Nano Super 接线
+## Jetson Nano 接线
 
 | Jetson Orin Nano Super | 模块 | 作用 |
 |---|---|---|
@@ -126,3 +135,12 @@ python -m compileall -q voice_control tools tests main.py __init__.py __main__.p
 | Pin 35 | LRCLK / WS | 左右声道时钟 |
 | Pin 40 | DIN | Jetson 输出到播放器 |
 | Pin 38 | SD | 麦克风输出到 Jetson |
+
+
+## 输入声道
+
+硬件按双声道采集，KWS 接收单声道。`python3 main.py --mic-device kws_left` 选左声道；`--mic-device kws_right` 选右声道；`--mic-device kws_mix` 将两路各乘 0.5 后混合。只有两路都含有效语音时才使用混合模式。切换前停止现有监听程序，避免占用设备。
+
+硬件始终按双声道采集，送入 KWS 前选择或合成为单声道。用 `python3 main.py --mic-device kws_right` 选择右声道，或用 `python3 main.py --mic-device kws_mix` 将左右声道各乘 0.5 后混合。两路都含正常语音时才使用混合模式；若一路为噪声或削波信号，应选择有效的另一声道。切换前先停止正在运行的监听程序，避免设备占用。
+
+`python3 main.py` 默认启用持续音频模式，与 `python3 main.py --continuous-audio` 效果相同。此模式持续输出静音，提示音转换为 16 kHz 后通过同一个播放流输出，收放音使用相同的硬件采样率；原 WAV 不变。运行过程中减少设备启停，首次启动和最终退出仍可能产生瞬态。支持工程的左、右、混合输入和 `hw:APE,0` 输出。ECSnake 接入时设置 `VoiceConfig(continuous_audio=True)`，并在退出时调用 `stop()`，等待 `run()` 返回以释放设备。

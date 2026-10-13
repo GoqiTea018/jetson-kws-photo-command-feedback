@@ -14,12 +14,14 @@ from threading import Event
 from .config import (
     COMMAND_SOUNDS, DEFAULT_SHERPA_DIR, MIC_DEVICE, PLAYBACK_SETTLE_SECONDS,
     CONFIG_DIR, SOUNDS_DIR, SLEEP_KEYWORD, SPEAKER_DEVICE,
-    WAKE_KEYWORD, KEYWORD_COMMANDS, VoiceCommand,
+    WAKE_KEYWORD, KEYWORD_COMMANDS, VoiceCommand, PROJECT_MIC_DEVICES,
 )
 from .command_handler import CommandHandler, CommandResult
 from .audio_capture import configure_capture_route
 from .audio_feedback import play_audio
 from .kws_engine import realtime_command
+from .hardware_check import check_audio_connections
+from .continuous_playback import ContinuousPlayback
 
 
 # 从 KWS 日志的 JSON 事件中提取 keyword 字段；第 1 个捕获组是中文关键词。
@@ -111,6 +113,7 @@ class VoiceConfig:
     speaker_device: str = SPEAKER_DEVICE  # aplay 使用的 ALSA 输出设备名称。
     once: bool = False                    # True：处理一条指令后退出；False：持续监听。
     volume_meter: bool = False            # True：使用音量版 KWS 并打印输入音量。
+    continuous_audio: bool = False        # True：保持静音输出，提示音共用同一播放流。
 
 
 class VoiceController:
@@ -129,6 +132,13 @@ class VoiceController:
         self.config = config                  # 本实例的路径、设备和运行模式。
         self.command_handler = command_handler  # None 表示只演示语音反馈。
         self._stop_event = Event()             # 初始未设置；stop() 设置后各监听循环退出。
+        self._playback = None                  # 持续播放模式的输出流，run() 结束后回收。
+
+    def _play_sound(self, sound_path: Path) -> None:
+        if self._playback is None:
+            play_audio(sound_path, self.config.speaker_device)
+        else:
+            self._playback.play(sound_path)
 
     def stop(self) -> None:
         """可跨线程请求停止；当前业务调用或音频播放完成后再退出。
@@ -138,10 +148,11 @@ class VoiceController:
         """
         self._stop_event.set()
 
-    def _handle_command(self, keyword: str, sound_path: Path) -> None:
+    def _handle_command(self, keyword: str, sound_path: Path | None) -> None:
         """处理中文 keyword，使用 sound_path 播放该动作的反馈；不返回业务结果。
 
-        休眠是语音内部指令；其他动作传给业务函数，确认成功后才播放音频。
+        休眠是语音内部指令；其他动作传给业务函数，确认成功后播放已配置的音频。
+        sound_path 为 None 时跳过音频播放，业务调用照常执行。
         前缀 _ 表示内部方法，调用方应通过 run() 启动完整流程。
         """
         voice_command = KEYWORD_COMMANDS[keyword]  # 中文识别词转换后的业务枚举。
@@ -157,18 +168,34 @@ class VoiceController:
             if not result.success:
                 print(f"指令执行失败：{keyword}：{result.message}", flush=True)
                 return
-            play_audio(sound_path, self.config.speaker_device)
+            if sound_path is not None:
+                self._play_sound(sound_path)
             print(f"指令执行成功：{keyword}", flush=True)
         else:
-            play_audio(sound_path, self.config.speaker_device)
-            print(f"提示音播放完成：{keyword}", flush=True)
+            if sound_path is not None:
+                self._play_sound(sound_path)
+                print(f"提示音播放完成：{keyword}", flush=True)
+            else:
+                print(f"已识别指令：{keyword}", flush=True)
 
     def run(self) -> None:
         """持续监听；Ctrl+C/stop() 退出，once 模式处理一条指令后返回。
 
         一个实例只在一个工作线程运行；停止后新建实例才能重新启动。
         """
-        _run_listener(self)
+        if not self.config.continuous_audio:
+            _run_listener(self)
+            return
+        if self.config.mic_device not in PROJECT_MIC_DEVICES or self.config.speaker_device != "hw:APE,0":
+            raise RuntimeError("持续音频模式仅支持工程 kws_left/right/mix 输入和 hw:APE,0 输出")
+        self._playback = ContinuousPlayback(self.config.speaker_device)
+        try:
+            self._playback.start()
+            check_audio_connections(self.config.mic_device, self.config.speaker_device, check_playback=False)
+            _run_listener(self)
+        finally:
+            self._playback.close()
+            self._playback = None
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -177,19 +204,22 @@ def main(argv: list[str] | None = None) -> None:
     argv 是命令行参数列表；None 表示读取启动命令中的参数。
     ECSnake 集成时直接创建 VoiceController，无需调用这个命令行入口。
     """
-    parser = argparse.ArgumentParser(description="先用‘楠机楠机’唤醒，再识别指令并播放语音提示")
+    parser = argparse.ArgumentParser(description="先用‘小南小南’唤醒，再识别指令并播放语音提示")
     parser.add_argument("--sherpa-dir", type=Path, default=DEFAULT_SHERPA_DIR)
-    parser.add_argument("--mic-device", default=MIC_DEVICE)
+    parser.add_argument("--mic-device", default=MIC_DEVICE, help="输入设备：kws_left（左）、kws_right（右）、kws_mix（左右平均），或其他 ALSA 设备")
     parser.add_argument("--speaker-device", default=SPEAKER_DEVICE)
     parser.add_argument("--once", action="store_true", help="识别并播放一次后退出，便于验收")
     parser.add_argument("--volume-meter", action="store_true", help="同时打印 KWS 输入音量，需先运行 python -m tools.build_volume_meter")
+    parser.add_argument("--continuous-audio", action="store_true", default=True, help="默认已启用：持续输出静音，提示音共用 16 kHz 播放流，减少运行中的启停爆破音")
     args = parser.parse_args(argv)  # argparse.Namespace 保存各命令行选项的值。
     # vars(args) 把参数对象转换成字典，字段名与 VoiceConfig 一一对应。
     controller = VoiceController(VoiceConfig(**vars(args)))
     try:
+        if not args.continuous_audio:
+            check_audio_connections(args.mic_device, args.speaker_device)
         controller.run()
-    except FileNotFoundError as error:
-        parser.error(str(error))
+    except (FileNotFoundError, RuntimeError) as error:
+        parser.exit(1, f"启动失败：{error}\n")
 
 
 def _run_listener(controller: VoiceController) -> None:
@@ -201,35 +231,32 @@ def _run_listener(controller: VoiceController) -> None:
     config = controller.config  # 本轮运行使用的不可变配置对象。
 
     greeting = SOUNDS_DIR / "nanji.wav"  # 唤醒问候语的完整路径。
-    sounds = {keyword: SOUNDS_DIR / filename for keyword, filename in COMMAND_SOUNDS.items()}  # 中文指令 -> 完整音频路径。
+    sounds = {keyword: SOUNDS_DIR / filename if filename else None for keyword, filename in COMMAND_SOUNDS.items()}  # 中文指令 -> 可选音频路径。
     sherpa_dir = config.sherpa_dir.expanduser().resolve()  # 展开 ~，转换为绝对路径。
     # 未启用音量时，继续调用原版可执行文件与原有参数。
     meter_options = {"volume_meter": True} if config.volume_meter else {}  # 可选命令构建参数。
     # 两个列表分别加载唤醒词和指令词文件；每次只启动其中一个监听进程。
     wake_command = realtime_command(sherpa_dir, CONFIG_DIR / "wake_keywords.txt", config.mic_device, **meter_options)
     command_listener_command = realtime_command(sherpa_dir, CONFIG_DIR / "command_keywords.txt", config.mic_device, **meter_options)
-    # 仅虚拟左声道设备加载项目 ALSA 配置；显式设备沿用系统配置。
+    # 工程的三种双声道采集路由加载同一个 ALSA 配置；其他设备沿用系统配置。
     env = None  # KWS 子进程的环境；需要额外配置时复制 os.environ，避免修改主程序环境。
-    if config.mic_device == MIC_DEVICE:
+    if config.mic_device in PROJECT_MIC_DEVICES:
         env = {**os.environ, "ALSA_CONFIG_PATH": str(CONFIG_DIR / "kws-left.asoundrc")}
     if config.volume_meter:
         env = {**(env if env is not None else os.environ), "SHERPA_KWS_VOLUME": "1"}
     for sound in (greeting, *sounds.values()):
-        if not sound.is_file():
+        if sound is not None and not sound.is_file():
             raise FileNotFoundError(f"提示音不存在: {sound}")
-
-    if controller.command_handler is None:
-        print("提示音演示模式：不会执行相机或机械动作；音频内容不代表业务成功。", flush=True)
 
     try:
         while not controller._stop_event.is_set():
             configure_capture_route()
-            print("等待唤醒词‘楠机楠机’；按 Ctrl+C 退出。", flush=True)
+            print("等待唤醒词‘小南小南’；按 Ctrl+C 退出。", flush=True)
             wait_for_keyword(wake_command, {WAKE_KEYWORD}, env, controller._stop_event)
             if controller._stop_event.is_set():
                 return
-            print("识别到唤醒词“楠机楠机”，播放问候语", flush=True)
-            play_audio(greeting, config.speaker_device)
+            print("识别到唤醒词“小南小南”，播放问候语", flush=True)
+            controller._play_sound(greeting)
             print("问候语播放完成，请说指令", flush=True)
             # 内层循环维持唤醒状态；退出指令返回外层重新等待唤醒。
             while not controller._stop_event.is_set():

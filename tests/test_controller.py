@@ -11,6 +11,16 @@ from voice_control import controller
 
 
 class ControllerTests(unittest.TestCase):
+    def setUp(self):
+        # CLI 默认使用持续播放；测试中模拟该输出流，避免访问声卡。
+        playback_patch = patch.object(controller, "ContinuousPlayback")
+        playback = playback_patch.start().return_value
+        playback.play.side_effect = lambda sound: controller.play_audio(sound, controller.SPEAKER_DEVICE)
+        self.addCleanup(playback_patch.stop)
+        check_patch = patch.object(controller, "check_audio_connections")
+        check_patch.start()
+        self.addCleanup(check_patch.stop)
+
     def test_stop_without_keyword_releases_listener(self):
         process = MagicMock()
         process.poll.return_value = None
@@ -24,7 +34,7 @@ class ControllerTests(unittest.TestCase):
             controller.select, "select", side_effect=poll
         ), patch.object(controller.os, "read") as read:
             with self.assertRaises(controller.ListenerStopped):
-                controller.wait_for_keyword(["kws"], {"楠机楠机"}, stop_event=stop_event)
+                controller.wait_for_keyword(["kws"], {"小南小南"}, stop_event=stop_event)
         read.assert_not_called()
         process.terminate.assert_called_once()
         process.stderr.close.assert_called_once()
@@ -47,11 +57,11 @@ class ControllerTests(unittest.TestCase):
         with patch.object(controller.subprocess, "Popen", return_value=process), patch.object(
             controller.os, "read", side_effect=[
                 '{"keyword":"拍照"}'.encode("utf-8"),
-                '{"keyword":"楠机楠机"}'.encode("utf-8"),
+                '{"keyword":"小南小南"}'.encode("utf-8"),
             ]
         ) as read:
-            result = controller.wait_for_keyword(["kws"], {"楠机楠机"})
-        self.assertEqual(result, "楠机楠机")
+            result = controller.wait_for_keyword(["kws"], {"小南小南"})
+        self.assertEqual(result, "小南小南")
         self.assertEqual(read.call_count, 2)
         process.terminate.assert_called_once()
 
@@ -89,9 +99,9 @@ class ControllerTests(unittest.TestCase):
                 steps = []
 
                 def wait(command, keywords, env, stop_event=None):
-                    if "楠机楠机" in keywords:
-                        steps.append(("wait", "楠机楠机"))
-                        return "楠机楠机"
+                    if "小南小南" in keywords:
+                        steps.append(("wait", "小南小南"))
+                        return "小南小南"
                     steps.append(("wait", "command"))
                     return keyword
 
@@ -106,12 +116,14 @@ class ControllerTests(unittest.TestCase):
                     with redirect_stdout(io.StringIO()) as output:
                         controller.main()
 
-                self.assertEqual(steps, [
-                    ("wait", "楠机楠机"),
+                expected = [
+                    ("wait", "小南小南"),
                     ("play", "nanji.wav"),
                     ("wait", "command"),
-                    ("play", filename),
-                ])
+                ]
+                if filename:
+                    expected.append(("play", filename))
+                self.assertEqual(steps, expected)
                 self.assertIn(f"识别到指令“{keyword}”", output.getvalue())
 
     def test_one_wake_accepts_multiple_commands(self):
@@ -119,9 +131,9 @@ class ControllerTests(unittest.TestCase):
         commands = iter(("拍照", "测量"))
 
         def wait(command, keywords, env, stop_event=None):
-            if "楠机楠机" in keywords:
+            if "小南小南" in keywords:
                 steps.append("wake")
-                return "楠机楠机"
+                return "小南小南"
             try:
                 keyword = next(commands)
             except StopIteration:
@@ -147,15 +159,15 @@ class ControllerTests(unittest.TestCase):
 
     def test_goodbye_returns_to_wake_listener(self):
         steps = []
-        commands = iter(("拍照", "再见楠机", "测量"))
+        commands = iter(("拍照", "再见小南", "测量"))
         wake_count = 0
 
         def wait(command, keywords, env, stop_event=None):
             nonlocal wake_count
-            if "楠机楠机" in keywords:
+            if "小南小南" in keywords:
                 wake_count += 1
                 steps.append("wake")
-                return "楠机楠机"
+                return "小南小南"
             try:
                 keyword = next(commands)
             except StopIteration:
@@ -176,7 +188,7 @@ class ControllerTests(unittest.TestCase):
         self.assertEqual(wake_count, 2)
         self.assertEqual(steps, [
             "wake", "nanji.wav", "拍照", "takephoto.wav",
-            "再见楠机", "goodbye.wav", "wake", "nanji.wav", "测量", "measure.wav",
+            "再见小南", "goodbye.wav", "wake", "nanji.wav", "测量", "measure.wav",
         ])
         self.assertIn("已退出指令模式，重新等待唤醒", output.getvalue())
 

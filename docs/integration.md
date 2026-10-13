@@ -34,4 +34,3 @@ voice_controller = VoiceController(VoiceConfig(), command_handler=handle_command
 | `sleep` | 本服务内部处理 | 播放退出提示后回到等待唤醒，不发送业务指令。 |
 
 Qt 适配层应从语音工作线程发出 queued signal，在 GUI 线程调用界面入口；语音线程等待完成/失败结果或超时后返回 `CommandResult`。业务完成后播放成功提示音；失败或异常时输出原因并继续监听。当前没有失败提示音，失败原因只打印到终端。
-

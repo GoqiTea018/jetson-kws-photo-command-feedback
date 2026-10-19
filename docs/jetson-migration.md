@@ -7,11 +7,14 @@
 aarch64、Python 3.12.3。语音工程在 `~/Documents/voice/photo_test`，依赖在同级
 `sherpa-onnx`。sherpa-onnx 1.13.8（11afbd00），ONNX Runtime 1.28.2。
 
-运行依赖包完整保留 gem 的 sherpa-onnx 目录，包括 `build/bin`、`build/lib` 和
-`sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20` 模型。逐文件 SHA256 见
-[清单](../deployment/gem-r39.2.1/runtime-manifest.json)。使用的是 chunk-16-left-64
-浮点 ONNX encoder、decoder、joiner 和 tokens.txt。上游项目为
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)，预编译包来自其官方 linux-aarch64 shared CPU 发行版。
+大文件从官方固定版本下载：程序包为 v1.13.8 linux-aarch64 shared CPU，模型为
+`sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20`。已对照 gem 核验 44 个程序/动态库和
+24 个模型配套文件，SHA256 全部一致，见 [核对记录](../deployment/gem-r39.2.1/upstream-verification.json)。
+[gem 文件清单](../deployment/gem-r39.2.1/runtime-manifest.json) 保留逐文件 SHA256；
+[官方压缩包校验值](../deployment/gem-r39.2.1/UPSTREAM-SHA256SUMS) 用于下载校验。
+实际使用 chunk-16-left-64 浮点 ONNX encoder、decoder、joiner 和 tokens.txt。
+模型、程序、动态库不重复上传；小型词表、ALSA 配置、I2S overlay 及提示音已纳入仓库。
+本地保留的 gem 归档仅作备份，仓库中的 `SHA256SUMS` 对应该本地归档。
 
 ## 1. 安装并取得工程和运行依赖
 
@@ -23,15 +26,17 @@ sudo apt install -y git python3 python3-venv alsa-utils libasound2-dev device-tr
 mkdir -p ~/Documents/voice
 cd ~/Documents/voice
 git clone https://github.com/GoqiTea018/jetson-kws-photo-command-feedback.git photo_test
-curl -fL -o gem-kws-runtime-20261019-linux-aarch64.tar.gz \
-  https://github.com/GoqiTea018/jetson-kws-photo-command-feedback/releases/download/gem-runtime-20261019/gem-kws-runtime-20261019-linux-aarch64.tar.gz
-sha256sum -c photo_test/deployment/gem-r39.2.1/SHA256SUMS
-tar -xzf gem-kws-runtime-20261019-linux-aarch64.tar.gz
+curl -fL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-linux-aarch64-shared-cpu.tar.bz2
+curl -fL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2
+sha256sum -c photo_test/deployment/gem-r39.2.1/UPSTREAM-SHA256SUMS
+mkdir -p sherpa-onnx/build
+tar -xjf sherpa-onnx-v1.13.8-linux-aarch64-shared-cpu.tar.bz2 -C sherpa-onnx/build --strip-components=1
+tar -xjf sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2 -C sherpa-onnx
 ldd sherpa-onnx/build/bin/sherpa-onnx-keyword-spotter-alsa
 sherpa-onnx/build/bin/sherpa-onnx-version
 ```
 
-`ldd` 各项应解析到实际库，`build/lib` 应与 `build/bin` 一起保留。依赖包面向
+`ldd` 各项应解析到实际库，`build/lib` 应与 `build/bin` 一起保留。官方程序包面向
 Linux aarch64；不同系统版本若报 GLIBC/GLIBCXX 版本错误，在目标系统编译匹配的
 sherpa-onnx 并沿用模型与词表。目标机器已有 `sherpa-onnx` 时，先将旧目录改名备份再解压。
 

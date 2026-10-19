@@ -153,7 +153,18 @@ python -m compileall -q voice_control tools tests main.py __init__.py __main__.p
 
 仓库包含指令词表、ALSA 左右声道路由、全部当前使用的 WAV、事件音效，以及
 [gem I2S2 overlay 源码与二进制](deployment/gem-r39.2.1/)。
-KWS 可执行程序、动态库和模型放在
-[gem-runtime-20261019 Release](https://github.com/GoqiTea018/jetson-kws-photo-command-feedback/releases/tag/gem-runtime-20261019)，
-下载后解压到 `~/Documents/voice/` 即得到 `sherpa-onnx/`。
+KWS 程序、动态库和模型使用官方固定版本下载，不重复上传大文件。
+已逐文件核对，官方包中的 44 个程序/动态库和 24 个模型配套文件与 gem 的 SHA256 全部一致。
+新机完成上文的系统依赖安装和 `git clone` 后执行以下命令；若已有 `sherpa-onnx/`，先改名备份再解压。
+
+```bash
+cd ~/Documents/voice
+curl -fL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-linux-aarch64-shared-cpu.tar.bz2
+curl -fL -O https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2
+sha256sum -c photo_test/deployment/gem-r39.2.1/UPSTREAM-SHA256SUMS
+mkdir -p sherpa-onnx/build
+tar -xjf sherpa-onnx-v1.13.8-linux-aarch64-shared-cpu.tar.bz2 -C sherpa-onnx/build --strip-components=1
+tar -xjf sherpa-onnx-kws-zipformer-zh-en-3M-2025-12-20.tar.bz2 -C sherpa-onnx
+```
+
 运行时使用 Python 标准库；无需复制旧机器的虚拟环境。

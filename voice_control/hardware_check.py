@@ -33,8 +33,7 @@ def check_audio_connections(mic_device: str, speaker_device: str, check_playback
 
     mic_device 和 speaker_device 是 ALSA 输入、输出名称，由入口传入。
     工程的左、右、混合输入均检查 I2S2，并录制一秒单声道 PCM；所有设备均尝试
-    在 check_playback=True 时播放一秒静音；持续模式已有输出流时跳过此项。
-    临时 WAV 在检查结束后删除，不播放提示音。
+    播放一秒静音。临时 WAV 在检查结束后删除，不播放提示音。
     无输入信号时提示检查供电和接线；设备无法打开时显示错误原因。
     """
     if not sys.platform.startswith("linux"):

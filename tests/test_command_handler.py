@@ -8,6 +8,8 @@ from unittest.mock import Mock, patch
 
 from voice_control.config import VoiceCommand, KEYWORD_COMMANDS, COMMAND_SOUNDS
 from voice_control.command_handler import CommandResult
+from voice_control.sound_effects import COMMAND_EFFECTS, SOUND_FILES
+from voice_control.config import SOUNDS_DIR
 from voice_control.controller import VoiceConfig, VoiceController
 
 
@@ -23,7 +25,11 @@ class CommandHandlerTests(unittest.TestCase):
                     with patch.object(service, "_play_sound") as play, redirect_stdout(io.StringIO()) as output:
                         service._handle_command(keyword, None)
                     handler.assert_called_once_with(KEYWORD_COMMANDS[keyword])
-                    play.assert_not_called()
+                    effect = COMMAND_EFFECTS.get(KEYWORD_COMMANDS[keyword])
+                    if success and effect is not None and SOUND_FILES[effect]:
+                        play.assert_called_once_with(SOUNDS_DIR / SOUND_FILES[effect])
+                    else:
+                        play.assert_not_called()
                     self.assertIn("指令执行成功" if success else "指令执行失败", output.getvalue())
 
     def test_empty_prompt_without_handler_reports_recognition(self):
@@ -42,9 +48,9 @@ class CommandHandlerTests(unittest.TestCase):
             return CommandResult(True)
 
         controller = VoiceController(VoiceConfig(), handler)
-        with patch("voice_control.controller.play_audio", side_effect=lambda *args: steps.append("feedback")), redirect_stdout(io.StringIO()):
+        with patch("voice_control.controller.play_audio", side_effect=lambda path, *args: steps.append("effect" if path.name == "01_uisfx_minimal.wav" else "voice")), redirect_stdout(io.StringIO()):
             controller._handle_command("拍照", Path("takephoto.wav"))
-        self.assertEqual(steps, ["saved", "feedback"])
+        self.assertEqual(steps, ["saved", "effect", "voice"])
 
     def test_failure_exception_or_unconfirmed_result_suppresses_feedback(self):
         for outcome in (CommandResult(False, "保存失败"), None, True, CommandResult("pending"), RuntimeError("超时")):
@@ -70,7 +76,7 @@ class CommandHandlerTests(unittest.TestCase):
         with patch("voice_control.controller.play_audio") as play, redirect_stdout(io.StringIO()):
             controller._handle_command("拍照", Path("takephoto.wav"))
             controller._handle_command("测量", Path("measure.wav"))
-        self.assertEqual(play.call_count, 1)
+        self.assertEqual(play.call_count, 2)
         self.assertEqual(handler.call_args.args, (VoiceCommand.MEASURE,))
 
 

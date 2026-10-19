@@ -79,18 +79,19 @@ COMMAND_AUDIO_FILES = {
     VoiceCommand.STOP_RECORDING: "stop_record.wav",
     VoiceCommand.FREEZE: "freeze.wav",
     VoiceCommand.MEASURE: "measure.wav",
-    VoiceCommand.RESET: "reset.wav",
-    VoiceCommand.OPEN_ALBUM: "",  # 相册：待填写提示音文件名。
-    VoiceCommand.OPEN_MENU: "",  # 菜单：待填写提示音文件名。
-    VoiceCommand.DAY_MODE: "",  # 日间：待填写提示音文件名。
-    VoiceCommand.NIGHT_MODE: "",  # 夜间：待填写提示音文件名。
-    VoiceCommand.START_DETECTION: "",  # 开启检测：待填写提示音文件名。
-    VoiceCommand.STOP_DETECTION: "",  # 停止检测：待填写提示音文件名。
-    VoiceCommand.VIEW_ALERTS: "",  # 查看告警：待填写提示音文件名。
-    VoiceCommand.INCREASE_SPEED: "",  # 增加速度：待填写提示音文件名。
-    VoiceCommand.DECREASE_SPEED: "",  # 降低速度：待填写提示音文件名。
+    VoiceCommand.RESET: "reset.wav",#复位
+    VoiceCommand.OPEN_ALBUM: "PhotoAlbum.wav",  # 相册：待填写提示音文件名。
+    VoiceCommand.OPEN_MENU: "menu_open.wav",  # 菜单：待填写提示音文件名。
+    VoiceCommand.DAY_MODE: "day_mode.wav",  # 日间：待填写提示音文件名。
+    VoiceCommand.NIGHT_MODE: "night_mode.wav",  # 夜间：待填写提示音文件名。
+    VoiceCommand.START_DETECTION: "detection_start.wav",  # 开启检测：待填写提示音文件名。
+    VoiceCommand.STOP_DETECTION: "detection_stop.wav",  # 停止检测：待填写提示音文件名。
+    VoiceCommand.VIEW_ALERTS: "alerts_open.wav",  # 查看告警：待填写提示音文件名。
+    VoiceCommand.INCREASE_SPEED: "speed_up.wav",  # 增加速度：待填写提示音文件名。
+    VoiceCommand.DECREASE_SPEED: "speed_down.wav",  # 降低速度：待填写提示音文件名。
     VoiceCommand.SLEEP: "goodbye.wav",
 }
+
 # 中文识别结果 -> WAV 文件名，供监听服务预先检查音频文件是否存在。
 # 从业务映射生成，避免维护两套关键词表。
 COMMAND_SOUNDS = {

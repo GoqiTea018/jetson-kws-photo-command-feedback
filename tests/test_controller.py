@@ -8,6 +8,7 @@ from threading import Event
 from unittest.mock import MagicMock, patch
 
 from voice_control import controller
+from voice_control.sound_effects import COMMAND_EFFECTS, VOICE_FIRST_COMMANDS
 
 
 class ControllerTests(unittest.TestCase):
@@ -118,11 +119,17 @@ class ControllerTests(unittest.TestCase):
 
                 expected = [
                     ("wait", "小南小南"),
-                    ("play", "nanji.wav"),
+                    ("play", "xiaonan.wav"),
                     ("wait", "command"),
                 ]
+                command = controller.KEYWORD_COMMANDS[keyword]
+                effect = COMMAND_EFFECTS.get(command)
+                if effect is not None and command not in VOICE_FIRST_COMMANDS:
+                    expected.append(("play", "01_uisfx_minimal.wav"))
                 if filename:
                     expected.append(("play", filename))
+                if effect is not None and command in VOICE_FIRST_COMMANDS:
+                    expected.append(("play", "01_uisfx_minimal.wav"))
                 self.assertEqual(steps, expected)
                 self.assertIn(f"识别到指令“{keyword}”", output.getvalue())
 
@@ -154,7 +161,7 @@ class ControllerTests(unittest.TestCase):
             with redirect_stdout(io.StringIO()) as output:
                 controller.main()
 
-        self.assertEqual(steps, ["wake", "nanji.wav", "拍照", "takephoto.wav", "测量", "measure.wav"])
+        self.assertEqual(steps, ["wake", "xiaonan.wav", "拍照", "01_uisfx_minimal.wav", "takephoto.wav", "测量", "measure.wav", "01_uisfx_minimal.wav"])
         self.assertEqual(output.getvalue().count("继续监听指令"), 2)
 
     def test_goodbye_returns_to_wake_listener(self):
@@ -187,8 +194,8 @@ class ControllerTests(unittest.TestCase):
 
         self.assertEqual(wake_count, 2)
         self.assertEqual(steps, [
-            "wake", "nanji.wav", "拍照", "takephoto.wav",
-            "再见小南", "goodbye.wav", "wake", "nanji.wav", "测量", "measure.wav",
+            "wake", "xiaonan.wav", "拍照", "01_uisfx_minimal.wav", "takephoto.wav",
+            "再见小南", "goodbye.wav", "wake", "xiaonan.wav", "测量", "measure.wav", "01_uisfx_minimal.wav",
         ])
         self.assertIn("已退出指令模式，重新等待唤醒", output.getvalue())
 

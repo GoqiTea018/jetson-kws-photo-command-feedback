@@ -1,6 +1,6 @@
 # Jetson 离线唤醒与语音指令反馈
 
-在 Jetson Orin Nano Super 上持续监听 I2S 麦克风。说“小南小南”唤醒，扬声器播放 `nanji.wav`（“你好呀，我是楠机”）；播完后可连续说指令（拍照、录像、停止录像、复位、冻结画面、测量），已配置提示音的指令播放对应音频。说“再见小南”后播放 `goodbye.wav`，程序退出指令模式，重新等待“小南小南”。未唤醒时指令不会触发播放。识别与播放均在本机完成，运行时无需联网。
+在 Jetson Orin Nano Super 上持续监听 I2S 麦克风。说“小南小南”唤醒，扬声器播放 `xiaonan.wav`（“你好呀，我是楠机”）；播完后可连续说指令（拍照、录像、停止录像、复位、冻结画面、测量），已配置提示音的指令播放对应音频。说“再见小南”后播放 `goodbye.wav`，程序退出指令模式，重新等待“小南小南”。未唤醒时指令不会触发播放。识别与播放均在本机完成，运行时无需联网。
 
 | 指令 | 提示音 |
 | --- | --- |
@@ -10,15 +10,15 @@
 | 冻结画面 | `freeze.wav` |
 | 测量 | `measure.wav` |
 | 复位 | `reset.wav` |
-| 相册 | 暂空 |
-| 菜单 | 暂空 |
-| 日间 | 暂空 |
-| 夜间 | 暂空 |
-| 开启检测 | 暂空 |
-| 停止检测 | 暂空 |
-| 查看告警 | 暂空 |
-| 增加速度 | 暂空 |
-| 降低速度 | 暂空 |
+| 相册 | `PhotoAlbum.wav` |
+| 菜单 | `menu_open.wav` |
+| 日间 | `day_mode.wav` |
+| 夜间 | `night_mode.wav` |
+| 开启检测 | `detection_start.wav` |
+| 停止检测 | `detection_stop.wav` |
+| 查看告警 | `alerts_open.wav` |
+| 增加速度 | `speed_up.wav` |
+| 降低速度 | `speed_down.wav` |
 | 再见小南 | `goodbye.wav`，播放后重新等待唤醒 |
 
 新增指令的提示音可在 `voice_control/config.py` 的 `COMMAND_AUDIO_FILES` 中填写，例如 `VoiceCommand.OPEN_ALBUM: "album.wav"`，并把音频放入 `sounds/`。保留 `""` 时，指令照常识别并传给业务处理函数，跳过提示音播放。
@@ -41,7 +41,7 @@ photo_test/
 │   ├── audio_capture.py     # 麦克风收音
 │   └── audio_feedback.py    # 扬声器反馈
 ├── config/                  # 唤醒/指令/诊断关键词及 kws-left.asoundrc
-├── sounds/                  # 八个 WAV 格式提示音及 create_sounds.py 生成脚本
+├── sounds/                  # WAV 格式提示音及 create_sounds.py 生成中文语音脚本
 ├── tools/                   # photo_check、build_volume_meter 诊断工具
 ├── tests/                   # 无硬件回归测试
 ├── docs/                    # 代码说明、联动说明、音量说明及 history/
@@ -144,3 +144,16 @@ python -m compileall -q voice_control tools tests main.py __init__.py __main__.p
 硬件始终按双声道采集，送入 KWS 前选择或合成为单声道。用 `python3 main.py --mic-device kws_right` 选择右声道，或用 `python3 main.py --mic-device kws_mix` 将左右声道各乘 0.5 后混合。两路都含正常语音时才使用混合模式；若一路为噪声或削波信号，应选择有效的另一声道。切换前先停止正在运行的监听程序，避免设备占用。
 
 `python3 main.py` 默认启用持续音频模式，与 `python3 main.py --continuous-audio` 效果相同。此模式持续输出静音，提示音转换为 16 kHz 后通过同一个播放流输出，收放音使用相同的硬件采样率；原 WAV 不变。运行过程中减少设备启停，首次启动和最终退出仍可能产生瞬态。支持工程的左、右、混合输入和 `hw:APE,0` 输出。ECSnake 接入时设置 `VoiceConfig(continuous_audio=True)`，并在退出时调用 `stop()`，等待 `run()` 返回以释放设备。
+
+## 迁移到另一台 Jetson（2026-10-19 gem 快照）
+
+最新代码及提示音来自 gem 的 `/home/gem/Documents/voice/photo_test`。
+完整迁移步骤、I2S 接线/引脚配置、依赖安装和验收命令见
+[Jetson 迁移指南](docs/jetson-migration.md)。
+
+仓库包含指令词表、ALSA 左右声道路由、全部当前使用的 WAV、事件音效，以及
+[gem I2S2 overlay 源码与二进制](deployment/gem-r39.2.1/)。
+KWS 可执行程序、动态库和模型放在
+[gem-runtime-20261019 Release](https://github.com/GoqiTea018/jetson-kws-photo-command-feedback/releases/tag/gem-runtime-20261019)，
+下载后解压到 `~/Documents/voice/` 即得到 `sherpa-onnx/`。
+运行时使用 Python 标准库；无需复制旧机器的虚拟环境。

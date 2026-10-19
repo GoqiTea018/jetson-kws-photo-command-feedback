@@ -29,8 +29,9 @@ class ResourceLayoutTests(unittest.TestCase):
                 self.assertEqual(build.call_args_list[0].args[1], CONFIG_DIR / "wake_keywords.txt")
                 self.assertEqual(build.call_args_list[1].args[1], CONFIG_DIR / "command_keywords.txt")
                 self.assertEqual(wait.call_args_list[0].args[2]["ALSA_CONFIG_PATH"], str(CONFIG_DIR / "kws-left.asoundrc"))
-                self.assertEqual(play.call_args_list[0].args[0], SOUNDS_DIR / "nanji.wav")
-                self.assertEqual(play.call_args_list[1].args[0], SOUNDS_DIR / "takephoto.wav")
+                self.assertEqual(play.call_args_list[0].args[0], SOUNDS_DIR / "xiaonan.wav")
+                self.assertEqual(play.call_args_list[1].args[0], SOUNDS_DIR / "tones/candidates/takephoto/01_uisfx_minimal.wav")
+                self.assertEqual(play.call_args_list[2].args[0], SOUNDS_DIR / "takephoto.wav")
             finally:
                 os.chdir(original_directory)
 
@@ -40,7 +41,7 @@ class ResourceLayoutTests(unittest.TestCase):
         for name in ("wake_keywords.txt", "command_keywords.txt", "photo_keywords.txt", "kws-left.asoundrc"):
             with self.subTest(name=name):
                 self.assertTrue((CONFIG_DIR / name).is_file())
-        for name in ("nanji.wav", *COMMAND_AUDIO_FILES.values()):
+        for name in ("xiaonan.wav", *COMMAND_AUDIO_FILES.values()):
             with self.subTest(name=name):
                 if name:
                     self.assertTrue((SOUNDS_DIR / name).is_file())

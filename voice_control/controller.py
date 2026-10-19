@@ -22,6 +22,7 @@ from .audio_feedback import play_audio
 from .kws_engine import realtime_command
 from .hardware_check import check_audio_connections
 from .continuous_playback import ContinuousPlayback
+from .sound_effects import COMMAND_EFFECTS, VOICE_FIRST_COMMANDS, SoundEffects
 
 
 # 从 KWS 日志的 JSON 事件中提取 keyword 字段；第 1 个捕获组是中文关键词。
@@ -133,6 +134,7 @@ class VoiceController:
         self.command_handler = command_handler  # None 表示只演示语音反馈。
         self._stop_event = Event()             # 初始未设置；stop() 设置后各监听循环退出。
         self._playback = None                  # 持续播放模式的输出流，run() 结束后回收。
+        self._sound_effects = SoundEffects(play=lambda path: self._play_sound(path))
 
     def _play_sound(self, sound_path: Path) -> None:
         if self._playback is None:
@@ -148,11 +150,22 @@ class VoiceController:
         """
         self._stop_event.set()
 
+    def _play_command_feedback(self, command: VoiceCommand, voice_path: Path | None) -> None:
+        """按事件顺序播放音效与语音，共用当前音频输出。"""
+        effect = COMMAND_EFFECTS.get(command)
+        voice_first = command in VOICE_FIRST_COMMANDS
+        if voice_first and voice_path is not None:
+            self._play_sound(voice_path)
+        if effect is not None:
+            self._sound_effects.play(effect)
+        if not voice_first and voice_path is not None:
+            self._play_sound(voice_path)
+
     def _handle_command(self, keyword: str, sound_path: Path | None) -> None:
         """处理中文 keyword，使用 sound_path 播放该动作的反馈；不返回业务结果。
 
         休眠是语音内部指令；其他动作传给业务函数，确认成功后播放已配置的音频。
-        sound_path 为 None 时跳过音频播放，业务调用照常执行。
+        sound_path 为 None 时播放该事件已配置的非语音音效。
         前缀 _ 表示内部方法，调用方应通过 run() 启动完整流程。
         """
         voice_command = KEYWORD_COMMANDS[keyword]  # 中文识别词转换后的业务枚举。
@@ -168,12 +181,12 @@ class VoiceController:
             if not result.success:
                 print(f"指令执行失败：{keyword}：{result.message}", flush=True)
                 return
-            if sound_path is not None:
-                self._play_sound(sound_path)
+            self._play_command_feedback(voice_command, sound_path)
             print(f"指令执行成功：{keyword}", flush=True)
         else:
+            # 独立运行沿用演示模式，使用与业务接入相同的反馈顺序。
+            self._play_command_feedback(voice_command, sound_path)
             if sound_path is not None:
-                self._play_sound(sound_path)
                 print(f"提示音播放完成：{keyword}", flush=True)
             else:
                 print(f"已识别指令：{keyword}", flush=True)
@@ -230,7 +243,7 @@ def _run_listener(controller: VoiceController) -> None:
     """
     config = controller.config  # 本轮运行使用的不可变配置对象。
 
-    greeting = SOUNDS_DIR / "nanji.wav"  # 唤醒问候语的完整路径。
+    greeting = SOUNDS_DIR / "xiaonan.wav"  # 唤醒问候语的完整路径。
     sounds = {keyword: SOUNDS_DIR / filename if filename else None for keyword, filename in COMMAND_SOUNDS.items()}  # 中文指令 -> 可选音频路径。
     sherpa_dir = config.sherpa_dir.expanduser().resolve()  # 展开 ~，转换为绝对路径。
     # 未启用音量时，继续调用原版可执行文件与原有参数。
